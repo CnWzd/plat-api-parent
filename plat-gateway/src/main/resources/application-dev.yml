@@ -1,0 +1,71 @@
+server:
+  port: 8080
+  shutdown: graceful
+
+spring:
+  application:
+    name: plat-gateway
+  lifecycle:
+    timeout-per-shutdown-phase: 15s
+  cloud:
+    gateway:
+      routes:
+        # 管理服务 REST API（前端门户/后台统一入口，JWT 鉴权前置）
+        - id: admin-api
+          uri: http://127.0.0.1:8081
+          predicates:
+            - Path=/api/**
+          filters:
+            - name: CircuitBreaker
+              args:
+                name: adminApiCircuitBreaker
+                fallbackUri: forward:/fallback
+        # 开放 API（AppKey + HMAC 签名校验 -> 限流 -> 转发演示后端）
+        - id: open-api
+          uri: http://127.0.0.1:8081
+          predicates:
+            - Path=/openapi/**
+      # Redis 令牌桶限流（可选启用：Redis 就绪后取消注释并删除内存限流开关）
+      # default-filters:
+      #   - name: RequestRateLimiter
+      #     args:
+      #       redis-rate-limiter.replenishRate: 100
+      #       redis-rate-limiter.burstCapacity: 200
+      #       key-resolver: "#{@apiKeyResolver}"
+
+# 与 plat-admin 保持一致（网关解析 JWT 后注入 X-User-* 请求头透传下游）
+plat:
+  security:
+    jwt:
+      secret: dev-only-jwt-secret-0123456789abcdef0123456789abcdef
+  gateway:
+    # 管理服务地址（生产替换为注册中心服务发现 lb://plat-admin）
+    admin-base-url: http://127.0.0.1:8081
+    # 调用管理服务内部接口的令牌（与 plat-admin plat.security.internal-token 一致）
+    internal-token: dev-internal-token-9f8e7d6c5b4a
+    sign:
+      # 开放 API 签名校验：strict=启用 HMAC-SHA256；simple=仅校验 AppKey（联调便捷模式）
+      mode: strict
+      # 时间戳容忍窗口（秒）
+      clock-skew-seconds: 300
+    ratelimit:
+      # 内存令牌桶兜底实现（Redis 模式启用后可关闭）
+      memory-enabled: true
+    cache:
+      # appKey -> 鉴权数据包 本地缓存 TTL（秒）
+      app-auth-ttl-seconds: 30
+    log:
+      # 调用日志攒批：条数阈值与刷写间隔
+      batch-size: 50
+      flush-interval-ms: 2000
+
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,info,metrics
+
+logging:
+  level:
+    root: info
+    com.zdd.plat.gateway: info

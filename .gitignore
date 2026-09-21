@@ -1,0 +1,17 @@
+target/
+*.class
+*.jar
+!.mvn/wrapper/maven-wrapper.jar
+.idea/
+.workbuddy/
+*.iml
+.vscode/
+node_modules/
+dist/
+.DS_Store
+*.log
+.env
+.env.local
+.flattened-pom.xml
+*-prod.yml
+
